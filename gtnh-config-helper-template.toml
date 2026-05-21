@@ -1,0 +1,109 @@
+title = "Configuration file for GTNH Config Helper"
+
+# ---------------------------------------------------------------------------- #
+#  GTNH Config Helper — Template                                                #
+#                                                                               #
+#  Sections:                                                                    #
+#    [Config.text.*]  — Find/replace strings inside config files                #
+#    [Config.mods.*]  — Download and/or disable mods                            #
+#                                                                               #
+#  Common keys (available in all entries):                                      #
+#    side = "client" | "server" | "both"  (default: "both")                    #
+#                                                                               #
+# ---------------------------------------------------------------------------- #
+
+
+[Settings]
+# Reserved for future global settings
+
+
+# ============================================================================ #
+#  CONFIG FILE REPLACEMENTS                                                     #
+#                                                                               #
+#  Required keys:                                                               #
+#    file_path   — Path to the config file, relative to instance root          #
+#    finds_str   — String (or regex pattern) to search for                     #
+#    new_str     — Replacement string                                           #
+#                                                                               #
+#  Optional keys:                                                               #
+#    side        — "client" | "server" | "both"  (default: "both")             #
+#    use_regex   — true | false  (default: false)                               #
+# ============================================================================ #
+
+# --- Basic example: simple find/replace, applies to both sides ---
+[Config.text.GT-Pollution]
+file_path = '.minecraft/config/GregTech/Pollution.cfg'
+finds_str = 'B:"Activate Pollution"=true'
+new_str = 'B:"Activate Pollution"=false'
+
+# --- Regex example: matches regardless of current value ---
+[Config.text.GT-Pollution-Regex]
+file_path = '.minecraft/config/GregTech/Pollution.cfg'
+finds_str = 'B:"Activate Pollution"=(true|false)'
+new_str = 'B:"Activate Pollution"=false'
+use_regex = true
+
+# --- Client-only example ---
+[Config.text.JourneyMap-Waypoints]
+file_path = '.minecraft/config/darkerer.cfg'
+finds_str = 'S:mode=EVERYWHERE'
+new_str = 'S:mode=MOON_PHASE'
+side = 'client'
+
+# --- Server-only example ---
+[Config.text.Server-Tickrate]
+file_path = '.minecraft/config/somemod.cfg'
+finds_str = 'I:someconf=20'
+new_str = 'I:someconf=40'
+side = 'server'
+
+# --- Multiline example: inserting a line into a block ---
+# See TOML Documentation https://toml.io/en/v1.1.0#string
+[Config.text.ServerUtilities-GameRules-Content]
+file_path = '.minecraft/serverutilities/serverutilities.cfg'
+finds_str = '''
+S:flip_game_rules_when_empty_rules <
+
+         >
+'''
+new_str= '''
+S:flip_game_rules_when_empty_rules <
+            doDaylightCycle
+         >
+'''
+
+
+# ============================================================================ #
+#  MOD MANAGEMENT                                                               #
+#                                                                               #
+#  Required keys: (at least one of download_url or disable)                    #
+#    download_url — Direct URL to the .jar file to download                    #
+#    disable      — Regex pattern matching jars to rename to .jar.bak          #
+#                                                                               #
+#  Optional keys:                                                               #
+#    side         — "client" | "server" | "both"  (default: "both")            #
+#    mod_dir      — Path relative to instance root                              #
+#                   (default: .minecraft/mods for client, mods for server)     #
+# ============================================================================ #
+
+# --- Download only: add a mod that isn't in the default pack ---
+[Config.mods.WorldEdit]
+download_url = 'https://github.com/GTNewHorizons/worldedit-gtnh/releases/download/v0.0.9/worldedit-v0.0.9.jar'
+side = 'server'
+
+# --- Download + disable: replace an existing mod with a specific version ---
+[Config.mods.JourneyMap]
+download_url = 'https://github.com/TeamJM/journeymap-legacy/releases/download/5.2.16/journeymap-1.7.10-5.2.16-unlimited.jar'
+disable = 'journeymap-1\.7\.10-5\.\d+\.\d{1,2}-(fairplay|unlimited)\.jar'
+side = 'both'
+
+# --- Disable only: remove a mod without replacing it ---
+[Config.mods.Darkerer]
+disable = 'darkerer-1\.\d+\.\d{1,2}\.jar'
+side = 'client'
+
+# --- Custom mod_dir example ---
+[Config.mods.shaderpack-modernity]
+mod_dir = '.minecraft\shaderpacks'
+download_url  = 'https://cdn.example.com/shaderpack/ComplementaryReimagined_r5.6.1.zip'
+side = 'client'
