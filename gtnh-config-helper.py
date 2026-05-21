@@ -1,9 +1,11 @@
 import argparse
 import logging
 import re
+import shutil
 import sys
 import tomllib
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger('gtnh-config-helper')
@@ -46,6 +48,10 @@ def main():
     if not is_minecraft_install(instance_dir, args.side):
         sys.exit(f'FATAL ERROR: Could not confirm "{instance_dir}" is path to valid a minecraft installation.')
 
+    # Make backup directory
+    backup_dir = instance_dir / 'gtnh-config-helper' / 'backups' / datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    backup_dir.mkdir(parents=True, exist_ok=True)
+
     # Configuration Management
     for name, entry in config.get("Config", {}).get("text", {}).items():
         logger.debug(f'Processing "{name}"')
@@ -61,6 +67,7 @@ def main():
             instance_dir / entry["file_path"],
             entry["finds_str"],
             entry["new_str"],
+            backup_dir,
             entry.get("use_regex", False)
         )
 
@@ -113,7 +120,8 @@ def is_minecraft_install(path: Path, side: str) -> bool:
 
 
 # Function to replace string inside file, taking path, search and replace
-def replace_string_in_file(name: str, file: Path, search: str, replacement: str, use_regex: bool = False) -> bool:
+def replace_string_in_file(name: str, file: Path, search: str, replacement: str, backup_dir: Path,
+                           use_regex: bool = False) -> bool:
     prefix = f'[{name}]'
     try:
         content = file.read_text(encoding='utf-8')
@@ -123,6 +131,13 @@ def replace_string_in_file(name: str, file: Path, search: str, replacement: str,
     except OSError as e:
         logger.error(f'{prefix} Could not read "{file}": {e}')
         return False
+
+    backup_dest = backup_dir / file.name
+    if not backup_dest.exists():
+        shutil.copy2(file, backup_dest)
+        logger.debug(f'{prefix} Backed up "{file.name}"')
+    else:
+        logger.debug(f'{prefix} Backup already exists for "{file.name}", skipping')
 
     if use_regex:
         if re.search(search, content) is None:
