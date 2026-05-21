@@ -3,6 +3,7 @@ import logging
 import re
 import sys
 import tomllib
+import urllib.request
 from pathlib import Path
 
 logger = logging.getLogger('gtnh-config-helper')
@@ -13,7 +14,6 @@ VALID_SIDES = {"client", "server", "both"}
 def main():
     # ### START MAIN ### #
     cwd = Path.cwd()
-    script_dir = Path(__file__).parent
 
     # Parse command-line arguments
     parser = argparse.ArgumentParser(description='GTNH Config Helper')
@@ -46,9 +46,8 @@ def main():
     if not is_minecraft_install(instance_dir, args.side):
         sys.exit(f'FATAL ERROR: Could not confirm "{instance_dir}" is path to valid a minecraft installation.')
 
-    # TODO Don't forget to process path from arg
-    # TODO loop on specific config keys and replace matching strings in files
-    for name, entry in config["Config"]["text"].items():
+    # Configuration Management
+    for name, entry in config.get("Config", {}).get("text", {}).items():
         logger.debug(f'Processing "{name}"')
         side = entry.get("side", "both")
         if side not in VALID_SIDES:
@@ -63,6 +62,25 @@ def main():
             entry["finds_str"],
             entry["new_str"],
             entry.get("use_regex", False)
+        )
+
+    # Mod Management (add, disable or replace)
+    for name, entry in config.get("Config", {}).get("mods", {}).items():
+        logger.debug(f'Processing "{name}"')
+        side = entry.get("side", "both")
+        if side not in VALID_SIDES:
+            logger.error(f'Invalid side value "{side}" in entry "{name}", skipping')
+            continue
+        if side != "both" and side != args.side:
+            logger.debug(f'Skipping "{name}" (side: {side}, current: {args.side})')
+            continue
+
+        default_mod_dir = Path('.minecraft/mods') if args.side == 'client' else Path('mods')
+        download_or_disable_mod(
+            name,
+            Path.joinpath(instance_dir, entry.get("mod_dir", default_mod_dir)),
+            entry.get("download_url"),
+            entry.get("disable")
         )
 
     # ### END MAIN ### #
@@ -126,10 +144,54 @@ def replace_string_in_file(name: str, file: Path, search: str, replacement: str,
     try:
         file.write_text(new_content, encoding='utf-8')
     except OSError as e:
-        logger.error(f'{prefix}Could not write "{file}": {e}')
+        logger.error(f'{prefix} Could not write "{file}": {e}')
         return False
 
     logger.info(f'{prefix} Replaced successfully')
+    return True
+
+
+def download_or_disable_mod(name: str, full_mod_dir: Path, download_url: str | None,
+                            disable_pattern: str | None) -> bool:
+    prefix = f'[{name}]'
+
+    if not full_mod_dir.is_dir():
+        logger.error(f'{prefix} Mod directory not found: "{full_mod_dir}"')
+        return False
+
+    # If we know the target filename, check if it's already there
+    if download_url:
+        filename = Path(download_url).name
+        dest = full_mod_dir / filename
+        if dest.is_file():
+            logger.info(f'{prefix} Already present, skipping: "{filename}"')
+            return True
+
+    # Disable/backup matching jars
+    if disable_pattern:
+        try:
+            matched = [f for f in full_mod_dir.iterdir()
+                       if f.suffix == '.jar' and re.search(disable_pattern, f.name)]
+            if not matched:
+                logger.warning(f'{prefix} No jars matched disable pattern: {disable_pattern}')
+            for jar in matched:
+                bak = jar.with_suffix('.jar.bak')
+                jar.rename(bak)
+                logger.info(f'{prefix} Disabled: "{jar.name}" → "{bak.name}"')
+        except OSError as e:
+            logger.error(f'{prefix} Error during disable: {e}')
+            return False
+
+    # Download mod
+    if download_url:
+        try:
+            logger.info(f'{prefix} Downloading "{filename}"...')
+            urllib.request.urlretrieve(download_url, dest)
+            logger.info(f'{prefix} Downloaded successfully: "{filename}"')
+        except Exception as e:
+            logger.error(f'{prefix} Download failed: {e}')
+            return False
+
     return True
 
 
