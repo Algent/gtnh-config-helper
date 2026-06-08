@@ -52,6 +52,9 @@ def main():
     backup_dir = instance_dir / 'gtnh-config-helper' / 'backups' / datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     backup_dir.mkdir(parents=True, exist_ok=True)
 
+    # Self-update config from remote if a newer version is available
+    config = maybe_update_config(toml_file, config, backup_dir)
+
     # Configuration Management
     for name, entry in config.get("Config", {}).get("text", {}).items():
         logger.debug(f'Processing "{name}"')
@@ -62,13 +65,15 @@ def main():
         if side != "both" and side != args.side:
             logger.debug(f'Skipping "{name}" (side: {side}, current: {args.side})')
             continue
-        replace_string_in_file(
+        replacements = entry.get("replacements", [])
+        if not replacements:
+            logger.warning(f'[{name}] No replacements defined, skipping')
+            continue
+        apply_replacements_in_file(
             name,
             instance_dir / entry["file_path"],
-            entry["finds_str"],
-            entry["new_str"],
+            replacements,
             backup_dir,
-            entry.get("use_regex", False)
         )
 
     # Mod Management (add, disable or replace)
@@ -119,9 +124,51 @@ def is_minecraft_install(path: Path, side: str) -> bool:
         return False
 
 
-# Function to replace string inside file, taking path, search and replace
-def replace_string_in_file(name: str, file: Path, search: str, replacement: str, backup_dir: Path,
-                           use_regex: bool = False) -> bool:
+# Check [Settings].update_url for a newer config_version and, if found, replace the local
+# config file (backing up the old one) and return the refreshed config. On any failure the
+# local config is left untouched and returned as-is.
+def maybe_update_config(toml_file: Path, config: dict, backup_dir: Path) -> dict:
+    settings = config.get("Settings", {})
+    url = settings.get("update_url")
+    if not url:
+        return config
+
+    local_ver = settings.get("config_version", 0)
+
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            remote_bytes = resp.read()
+        remote_config = tomllib.loads(remote_bytes.decode('utf-8'))
+    except Exception as e:
+        logger.warning(f'Config update check failed, keeping local config: {e}')
+        return config
+
+    remote_ver = remote_config.get("Settings", {}).get("config_version")
+    if remote_ver is None:
+        logger.warning('Remote config has no config_version, keeping local config')
+        return config
+
+    if remote_ver <= local_ver:
+        logger.debug(f'Config is up to date (local v{local_ver}, remote v{remote_ver})')
+        return config
+
+    # Newer version available: back up the current file, then overwrite it
+    backup_dest = backup_dir / toml_file.name
+    try:
+        if not backup_dest.exists():
+            shutil.copy2(toml_file, backup_dest)
+            logger.debug(f'Backed up config to "{backup_dest}"')
+        toml_file.write_bytes(remote_bytes)
+    except OSError as e:
+        logger.warning(f'Could not write updated config, keeping local config: {e}')
+        return config
+
+    logger.info(f'Updated config v{local_ver} -> v{remote_ver} from "{url}"')
+    return remote_config
+
+
+# Apply a list of find/replace operations to a single file (single read, single write, single backup)
+def apply_replacements_in_file(name: str, file: Path, replacements: list, backup_dir: Path) -> bool:
     prefix = f'[{name}]'
     try:
         content = file.read_text(encoding='utf-8')
@@ -132,6 +179,38 @@ def replace_string_in_file(name: str, file: Path, search: str, replacement: str,
         logger.error(f'{prefix} Could not read "{file}": {e}')
         return False
 
+    original_content = content
+    for i, rep in enumerate(replacements):
+        sub_prefix = f'{prefix}[{i}]'
+        search = rep.get("finds_str")
+        replacement = rep.get("new_str")
+        use_regex = rep.get("use_regex", False)
+        if search is None or replacement is None:
+            logger.error(f'{sub_prefix} Missing "finds_str" or "new_str", skipping')
+            continue
+
+        if use_regex:
+            if re.search(search, content) is None:
+                if replacement in content:
+                    logger.info(f'{sub_prefix} Already correctly set, skipping')
+                else:
+                    logger.warning(f'{sub_prefix} Pattern did not match in "{file}" — unexpected config state')
+                continue
+            content = re.sub(search, replacement, content)
+        else:
+            if search not in content:
+                if replacement in content:
+                    logger.info(f'{sub_prefix} Already correctly set, skipping')
+                else:
+                    logger.warning(f'{sub_prefix} String not found in "{file}" — unexpected config state')
+                continue
+            content = content.replace(search, replacement)
+        logger.info(f'{sub_prefix} Replaced successfully')
+
+    if content == original_content:
+        logger.debug(f'{prefix} No changes to "{file.name}"')
+        return True
+
     backup_dest = backup_dir / file.name
     if not backup_dest.exists():
         shutil.copy2(file, backup_dest)
@@ -139,30 +218,11 @@ def replace_string_in_file(name: str, file: Path, search: str, replacement: str,
     else:
         logger.debug(f'{prefix} Backup already exists for "{file.name}", skipping')
 
-    if use_regex:
-        if re.search(search, content) is None:
-            logger.warning(f'{prefix} Pattern did not match in "{file}" — unexpected config state')
-            return False
-        if replacement in content:  # already set correctly
-            logger.info(f'{prefix} Already correctly set, skipping')
-            return True
-        new_content = re.sub(search, replacement, content)
-    else:
-        if search not in content:
-            logger.warning(f'{prefix} String not found in "{file}" — unexpected config state')
-            return False
-        if replacement in content:
-            logger.info(f'{prefix} Already correctly set, skipping')
-            return True
-        new_content = content.replace(search, replacement)
-
     try:
-        file.write_text(new_content, encoding='utf-8')
+        file.write_text(content, encoding='utf-8')
     except OSError as e:
         logger.error(f'{prefix} Could not write "{file}": {e}')
         return False
-
-    logger.info(f'{prefix} Replaced successfully')
     return True
 
 

@@ -14,59 +14,82 @@ title = "Configuration file for GTNH Config Helper"
 
 
 [Settings]
-# Reserved for future global settings
+# Optional self-update. If both keys are present, on startup the tool fetches the
+# config at update_url; if its config_version is greater than the local one, the
+# local file is backed up and replaced, then processing continues with the new config.
+# On any network/parse/write error the local config is kept and the tool continues.
+#config_version = 1
+#update_url = 'https://example.com/gtnh/config-file.toml'
 
 
 # ============================================================================ #
 #  CONFIG FILE REPLACEMENTS                                                     #
 #                                                                               #
-#  Required keys:                                                               #
+#  Each [Config.text.<name>] entry targets one file and contains one or more   #
+#  [[Config.text.<name>.replacements]] tables, each describing a find/replace. #
+#                                                                               #
+#  Entry-level keys:                                                            #
 #    file_path   — Path to the config file, relative to instance root          #
+#    side        — "client" | "server" | "both"  (default: "both")             #
+#                                                                               #
+#  Per-replacement keys:                                                        #
 #    finds_str   — String (or regex pattern) to search for                     #
 #    new_str     — Replacement string                                           #
-#                                                                               #
-#  Optional keys:                                                               #
-#    side        — "client" | "server" | "both"  (default: "both")             #
 #    use_regex   — true | false  (default: false)                               #
 # ============================================================================ #
 
 # --- Basic example: simple find/replace, applies to both sides ---
 [Config.text.GT-Pollution]
 file_path = '.minecraft/config/GregTech/Pollution.cfg'
+
+[[Config.text.GT-Pollution.replacements]]
 finds_str = 'B:"Activate Pollution"=true'
 new_str = 'B:"Activate Pollution"=false'
 
-# --- Regex example: matches regardless of current value ---
-[Config.text.GT-Pollution-Regex]
+# --- Multiple replacements in the same file, mixing regex and plain ---
+[Config.text.GT-Misc]
 file_path = '.minecraft/config/GregTech/Pollution.cfg'
+
+[[Config.text.GT-Misc.replacements]]
 finds_str = 'B:"Activate Pollution"=(true|false)'
 new_str = 'B:"Activate Pollution"=false'
+use_regex = true
+
+[[Config.text.GT-Misc.replacements]]
+finds_str = 'something_else=(true|false)'
+new_str = 'something_else=false'
 use_regex = true
 
 # --- Client-only example ---
 [Config.text.JourneyMap-Waypoints]
 file_path = '.minecraft/config/darkerer.cfg'
+side = 'client'
+
+[[Config.text.JourneyMap-Waypoints.replacements]]
 finds_str = 'S:mode=EVERYWHERE'
 new_str = 'S:mode=MOON_PHASE'
-side = 'client'
 
 # --- Server-only example ---
 [Config.text.Server-Tickrate]
 file_path = '.minecraft/config/somemod.cfg'
+side = 'server'
+
+[[Config.text.Server-Tickrate.replacements]]
 finds_str = 'I:someconf=20'
 new_str = 'I:someconf=40'
-side = 'server'
 
 # --- Multiline example: inserting a line into a block ---
 # See TOML Documentation https://toml.io/en/v1.1.0#string
 [Config.text.ServerUtilities-GameRules-Content]
 file_path = '.minecraft/serverutilities/serverutilities.cfg'
+
+[[Config.text.ServerUtilities-GameRules-Content.replacements]]
 finds_str = '''
 S:flip_game_rules_when_empty_rules <
 
          >
 '''
-new_str= '''
+new_str = '''
 S:flip_game_rules_when_empty_rules <
             doDaylightCycle
          >
