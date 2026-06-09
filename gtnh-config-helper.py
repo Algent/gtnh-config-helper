@@ -55,6 +55,19 @@ def main():
     # Self-update config from remote if a newer version is available
     config = maybe_update_config(toml_file, config, backup_dir)
 
+    # Layer a local, non-shared custom config on top, if present
+    custom_file = toml_file.with_name(f'{toml_file.stem}-custom{toml_file.suffix}')
+    if custom_file.is_file():
+        try:
+            with open(custom_file, 'rb') as f:
+                custom_config = tomllib.load(f)
+        except (tomllib.TOMLDecodeError, OSError) as e:
+            sys.exit(f'FATAL ERROR: Could not read custom config "{custom_file}": {e}')
+        config = deep_merge(config, custom_config)
+        logger.info(f'Merged custom config from "{custom_file.name}"')
+    else:
+        logger.debug(f'No custom config at "{custom_file}"')
+
     # Configuration Management
     for name, entry in config.get("Config", {}).get("text", {}).items():
         logger.debug(f'Processing "{name}"')
@@ -122,6 +135,17 @@ def is_minecraft_install(path: Path, side: str) -> bool:
         return all(checks)
     else:
         return False
+
+
+# Recursively merge overlay into base: nested tables merge, any other value (string, list,
+# bool, int) in overlay replaces the one in base. Mutates and returns base.
+def deep_merge(base: dict, overlay: dict) -> dict:
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
 
 
 # Check [Settings].update_url for a newer config_version and, if found, replace the local
