@@ -38,9 +38,6 @@ def main():
     with open(toml_file, 'rb') as f:
         config = tomllib.load(f)
 
-    logger.info(args.side)
-    logger.info(config)
-
     # Test instance_path
     instance_dir = Path(args.instance_path)
     if not instance_dir.is_dir():
