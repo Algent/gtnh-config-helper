@@ -271,9 +271,9 @@ def download_or_disable_mod(name: str, full_mod_dir: Path, download_url: str | N
             if not matched:
                 logger.warning(f'{prefix} No jars matched disable pattern: {disable_pattern}')
             for jar in matched:
-                bak = jar.with_suffix('.jar.bak')
-                jar.rename(bak)
-                logger.info(f'{prefix} Disabled: "{jar.name}" → "{bak.name}"')
+                disabled = jar.with_suffix('.jar.disabled')
+                jar.rename(disabled)
+                logger.info(f'{prefix} Disabled: "{jar.name}" → "{disabled.name}"')
         except OSError as e:
             logger.error(f'{prefix} Error during disable: {e}')
             return False
