@@ -211,21 +211,24 @@ def apply_replacements_in_file(name: str, file: Path, replacements: list, backup
             continue
 
         if use_regex:
-            if re.search(search, content) is None:
-                if replacement in content:
-                    logger.info(f'{sub_prefix} Already correctly set, skipping')
-                else:
-                    logger.warning(f'{sub_prefix} Pattern did not match in "{file}" — unexpected config state')
-                continue
-            content = re.sub(search, replacement, content)
+            new_content = re.sub(search, replacement, content)
+            matched = re.search(search, content) is not None
         else:
-            if search not in content:
-                if replacement in content:
-                    logger.info(f'{sub_prefix} Already correctly set, skipping')
-                else:
-                    logger.warning(f'{sub_prefix} String not found in "{file}" — unexpected config state')
-                continue
-            content = content.replace(search, replacement)
+            matched = search in content
+            new_content = content.replace(search, replacement)
+
+        if not matched:
+            if replacement in content:
+                logger.info(f'{sub_prefix} Already correctly set, skipping')
+            else:
+                logger.warning(f'{sub_prefix} Pattern did not match in "{file}" — unexpected config state')
+            continue
+
+        if new_content == content:
+            logger.info(f'{sub_prefix} Already correctly set, skipping')
+            continue
+
+        content = new_content
         logger.info(f'{sub_prefix} Replaced successfully')
 
     if content == original_content:
