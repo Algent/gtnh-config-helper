@@ -45,6 +45,8 @@ def main():
     if not is_minecraft_install(instance_dir, args.side):
         sys.exit(f'FATAL ERROR: Could not confirm "{instance_dir}" is path to valid a minecraft installation.')
 
+    base_dir = instance_dir / '.minecraft' if args.side == 'client' else instance_dir
+
     # Make backup directory
     backup_dir = instance_dir / 'gtnh-config-helper' / 'backups' / datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     backup_dir.mkdir(parents=True, exist_ok=True)
@@ -81,7 +83,7 @@ def main():
             continue
         apply_replacements_in_file(
             name,
-            instance_dir / entry["file_path"],
+            base_dir / entry["file_path"],
             replacements,
             backup_dir,
         )
@@ -97,10 +99,9 @@ def main():
             logger.debug(f'Skipping "{name}" (side: {side}, current: {args.side})')
             continue
 
-        default_mod_dir = Path('.minecraft/mods') if args.side == 'client' else Path('mods')
         download_or_disable_mod(
             name,
-            Path.joinpath(instance_dir, entry.get("mod_dir", default_mod_dir)),
+            base_dir / entry.get("mod_dir", 'mods'),
             entry.get("download_url"),
             entry.get("disable")
         )

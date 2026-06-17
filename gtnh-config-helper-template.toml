@@ -29,7 +29,8 @@ title = "Configuration file for GTNH Config Helper"
 #  [[Config.text.<name>.replacements]] tables, each describing a find/replace. #
 #                                                                               #
 #  Entry-level keys:                                                            #
-#    file_path   — Path to the config file, relative to instance root          #
+#    file_path   — Config file path; client: relative to <instance>/.minecraft  #
+#                  server: relative to <server> root (no ".minecraft" prefix)   #
 #    side        — "client" | "server" | "both"  (default: "both")             #
 #                                                                               #
 #  Per-replacement keys:                                                        #
@@ -40,7 +41,7 @@ title = "Configuration file for GTNH Config Helper"
 
 # --- Basic example: simple find/replace, applies to both sides ---
 [Config.text.GT-Pollution]
-file_path = '.minecraft/config/GregTech/Pollution.cfg'
+file_path = 'config/GregTech/Pollution.cfg'
 
 [[Config.text.GT-Pollution.replacements]]
 finds_str = 'B:"Activate Pollution"=true'
@@ -48,7 +49,7 @@ new_str = 'B:"Activate Pollution"=false'
 
 # --- Multiple replacements in the same file, mixing regex and plain ---
 [Config.text.GT-Misc]
-file_path = '.minecraft/config/GregTech/Pollution.cfg'
+file_path = 'config/GregTech/Pollution.cfg'
 
 [[Config.text.GT-Misc.replacements]]
 finds_str = 'B:"Activate Pollution"=(true|false)'
@@ -62,7 +63,7 @@ use_regex = true
 
 # --- Client-only example ---
 [Config.text.JourneyMap-Waypoints]
-file_path = '.minecraft/config/darkerer.cfg'
+file_path = 'config/darkerer.cfg'
 side = 'client'
 
 [[Config.text.JourneyMap-Waypoints.replacements]]
@@ -71,7 +72,7 @@ new_str = 'S:mode=MOON_PHASE'
 
 # --- Server-only example ---
 [Config.text.Server-Tickrate]
-file_path = '.minecraft/config/somemod.cfg'
+file_path = 'config/somemod.cfg'
 side = 'server'
 
 [[Config.text.Server-Tickrate.replacements]]
@@ -81,7 +82,7 @@ new_str = 'I:someconf=40'
 # --- Multiline example: inserting a line into a block ---
 # See TOML Documentation https://toml.io/en/v1.1.0#string
 [Config.text.ServerUtilities-GameRules-Content]
-file_path = '.minecraft/serverutilities/serverutilities.cfg'
+file_path = 'serverutilities/serverutilities.cfg'
 
 [[Config.text.ServerUtilities-GameRules-Content.replacements]]
 finds_str = '''
@@ -105,7 +106,7 @@ S:flip_game_rules_when_empty_rules <
 #                                                                               #
 #  Optional keys:                                                               #
 #    side         — "client" | "server" | "both"  (default: "both")            #
-#    mod_dir      — Path relative to instance root                              #
+#    mod_dir      — Mods dir (default "mods"); client: under .minecraft         #
 #                   (default: .minecraft/mods for client, mods for server)     #
 # ============================================================================ #
 
@@ -127,6 +128,6 @@ side = 'client'
 
 # --- Custom mod_dir example ---
 [Config.mods.shaderpack-modernity]
-mod_dir = '.minecraft\shaderpacks'
+mod_dir = 'shaderpacks'
 download_url  = 'https://cdn.example.com/shaderpack/ComplementaryReimagined_r5.6.1.zip'
 side = 'client'
